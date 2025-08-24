@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Product, Variant, Review
+from .models import Category, Product, Variant, Review ,Order
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -19,3 +19,11 @@ class ReviewAdmin(admin.ModelAdmin):
     search_fields = ['user__username', 'comment']
 
 admin.site.register(Review, ReviewAdmin)
+
+
+@admin.register(Order)
+class OrderAdmin(admin.ModelAdmin):
+    list_display = ['id', 'user', 'status', 'created_at']
+    list_filter = ['status', 'created_at']
+    search_fields = ['user__username', 'id']
+    ordering = ['-created_at']
