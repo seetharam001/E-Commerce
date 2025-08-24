@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.conf import settings
-
+from django.db.models import F, Sum, DecimalField, ExpressionWrapper
 
 class Category(models.Model):
     name = models.CharField(max_length=255, unique=True)
@@ -46,16 +46,35 @@ class Cart(models.Model):
 
     def __str__(self):
         return f"Cart of {self.user}"
+    
+    def total_price(self):
+        total = self.items.annotate(
+            item_total=ExpressionWrapper(
+                F('quantity') * F('product__price'),
+                output_field=DecimalField(max_digits=12, decimal_places=2)
+            )
+        ).aggregate(cart_total=Sum('item_total'))['cart_total'] or 0
+        return total
 
 class CartItem(models.Model):
     cart = models.ForeignKey(Cart, related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    variant = models.ForeignKey(
+        Variant,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='cart_items'
+    )  # Add this field
     quantity = models.PositiveIntegerField(default=1)
 
     class Meta:
-        unique_together = ('cart', 'product')
+        unique_together = ('cart', 'product', 'variant')
 
     def __str__(self):
+        if self.variant:
+            return f"{self.quantity} x {self.product.name} ({self.variant.variant_name})"
+        return f"{self.quantity} x {self.product.name}"
         return f"{self.quantity} x {self.product.name}"
 
 class Order(models.Model):
@@ -78,8 +97,10 @@ class Order(models.Model):
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    variant = models.ForeignKey(Variant, null=True, blank=True, on_delete=models.SET_NULL)
     quantity = models.PositiveIntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2)  # price at purchase time
 
     def __str__(self):
-        return f"{self.quantity} x {self.product.name}"
+        variant_info = f" ({self.variant.variant_name})" if self.variant else ""
+        return f"{self.quantity} x {self.product.name}{variant_info}"
